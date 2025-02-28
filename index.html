@@ -3,6 +3,8 @@
 <head>
     <title>Space Shooter</title>
     <link rel="stylesheet" href="style.css">
+    <audio id="shootSound" src="shoot.mp3" preload="auto"></audio>
+    <audio id="explosionSound" src="explosion.mp3" preload="auto"></audio>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
@@ -10,6 +12,7 @@
         <div id="score">Score: 0</div>
         <div id="highScore">High Score: 0</div>
     </div>
+    <button id="restartButton" style="display: none;">Restart</button>
     <script src="game.js"></script>
 </body>
 </html>

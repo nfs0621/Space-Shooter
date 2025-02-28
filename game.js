@@ -3,6 +3,8 @@ const ctx = canvas.getContext('2d');
 const scoreElement = document.getElementById('score');
 const highScoreElement = document.getElementById('highScore');
 
+const shootSound = document.getElementById('shootSound');
+const explosionSound = document.getElementById('explosionSound');
 // Set canvas size
 canvas.width = 800;
 canvas.height = 600;
@@ -21,7 +23,7 @@ class Player {
         this.shotInterval = 200; // Default shot interval
     }
 
-    draw() {
+     draw() {
         ctx.fillStyle = '#00ff00';
         // Triangle for player
         ctx.beginPath();
@@ -85,6 +87,7 @@ class Enemy {
 }
 
 const player = new Player();
+
 let bullets = [];
 let enemies = [];
 let powerUps = [];
@@ -93,12 +96,20 @@ let enemiesSpawned = 0;
 let gameRunning = true;
 let highScore = localStorage.getItem('highScore') || 0;
 highScoreElement.textContent = `High Score: ${highScore}`;
-let enemySpeedMultiplier = 0.5;
+let enemySpeedMultiplier = 0.1;
 
 const POWERUP_TYPES = {
     SHIELD: 'shield',
     TRIPLE_SHOT: 'triple_shot',
-    SLOW_SHOT: 'slow_shot'
+    SLOW_SHOT: 'slow_shot',
+    FAST_SHOT: 'fast_shot'
+};
+
+let powerUpTimeouts = {
+    [POWERUP_TYPES.SHIELD]: null,
+    [POWERUP_TYPES.TRIPLE_SHOT]: null,
+    [POWERUP_TYPES.SLOW_SHOT]: null,
+    [POWERUP_TYPES.FAST_SHOT]: null
 };
 
 class PowerUp {
@@ -110,16 +121,34 @@ class PowerUp {
         this.speed = 2;
         this.type = this.getRandomType();
     }
-    getRandomType() {
-        const types = Object.values(POWERUP_TYPES);
-        return types[Math.floor(Math.random() * types.length)];
+  getRandomType() {
+    const types = Object.values(POWERUP_TYPES);
+    const probabilities = [
+      0.3, // SHIELD (30%)
+      0.3, // TRIPLE_SHOT (30%)
+      0.1, // SLOW_SHOT (10%) - Reduced probability
+      0.3, // FAST_SHOT (30%)
+    ];
+
+    let cumulativeProbability = 0;
+    const randomNumber = Math.random();
+
+    for (let i = 0; i < types.length; i++) {
+      cumulativeProbability += probabilities[i];
+      if (randomNumber <= cumulativeProbability) {
+        return types[i];
+      }
     }
+
+    // Fallback in case probabilities don't add up to 1 (shouldn't happen)
+    return types[0];
+  }
     update() {
         this.y += this.speed;
     }
 
     draw() {
-        ctx.fillStyle = 'purple'; // Default color, will be overridden
+        ctx.fillStyle = 'pink'; // Default color, will be overridden
         switch (this.type) {
             case POWERUP_TYPES.SHIELD:
                 ctx.fillStyle = 'blue'; // Shield - Blue
@@ -163,6 +192,20 @@ class PowerUp {
                 ctx.lineTo(this.x + this.width / 2 + this.width / 4, this.y + this.height / 2);
                 ctx.stroke();
                 break;
+            case POWERUP_TYPES.FAST_SHOT:
+                // Fast-shot: A lightning bolt
+                ctx.fillStyle = 'yellow';
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.width / 2, this.y);
+                ctx.lineTo(this.x + this.width / 4, this.y + this.height / 2);
+                ctx.lineTo(this.x + this.width / 2, this.y + this.height / 2);
+                ctx.lineTo(this.x + this.width / 2, this.y + this.height);
+                ctx.lineTo(this.x + this.width * 3 / 4, this.y + this.height / 2);
+                ctx.lineTo(this.x + this.width / 2, this.y + this.height / 2);
+                ctx.closePath();
+                ctx.fill();
+                break;
+
         }
         ctx.closePath();
     }
@@ -210,6 +253,8 @@ function gameLoop() {
                 bullets.splice(bulletIndex, 1);
                 score += 10;
                 scoreElement.textContent = `Score: ${score}`;
+                explosionSound.currentTime = 0; // Reset sound to start
+                explosionSound.play();
             }
         });
 
@@ -272,15 +317,19 @@ function activatePowerUp(powerUp) {
     switch (powerUp.type) {
         case POWERUP_TYPES.SHIELD:
             player.shielded = true;
-            setTimeout(() => { player.shielded = false; }, 5000); // 5 seconds
+            powerUpTimeouts[powerUp.type] = setTimeout(() => { player.shielded = false; }, 50000); // 5 seconds
             break;
         case POWERUP_TYPES.TRIPLE_SHOT:
             player.tripleShot = true;
-            setTimeout(() => { player.tripleShot = false; }, 7000); // 7 seconds
+            powerUpTimeouts[powerUp.type] = setTimeout(() => { player.tripleShot = false; }, 70000); // 7 seconds
             break;
         case POWERUP_TYPES.SLOW_SHOT:
             player.slowShot = true;
-            setTimeout(()=> { player.slowShot = false; }, 10000); //10 sec
+            powerUpTimeouts[powerUp.type] = setTimeout(()=> { player.slowShot = false; }, 10000); //10 sec
+            break;
+        case POWERUP_TYPES.FAST_SHOT:
+            player.fastShot = true;
+            powerUpTimeouts[powerUp.type] = setTimeout(() => { player.fastShot = false; }, 50000); // 5 seconds
             break;
     }
 }
@@ -295,6 +344,11 @@ function gameOver() {
     document.getElementById('restartButton').style.display = 'block';
 
 }
+
+// Restart game functionality
+document.getElementById('restartButton').addEventListener('click', () => {
+    document.location.reload();
+});
 
 // Event listeners
 document.addEventListener('mousemove', (e) => {
@@ -313,13 +367,15 @@ let isShooting = false;
 
 function attemptShoot() {
     const now = Date.now();
-    if (player.slowShot){
-        player.shotInterval = 1000;
+    let currentShotInterval = 200; // Default shot interval
+
+    if (player.slowShot) {
+        currentShotInterval = 1000;
+    } else if (player.fastShot) {
+        currentShotInterval = 5; // 500% speed increase (200 / 5)
     }
-    else {
-        player.shotInterval = 200;
-    }
-    if (now - player.lastShotTime > player.shotInterval) {
+
+    if (now - player.lastShotTime > currentShotInterval) {
         if (player.tripleShot) {
             bullets.push(new Bullet(player.x + player.width / 2 - 2.5, player.y, -25 * Math.PI / 180)); // Left bullet
             bullets.push(new Bullet(player.x + player.width / 2 - 2.5, player.y)); // Center bullet
@@ -328,6 +384,8 @@ function attemptShoot() {
             bullets.push(new Bullet(player.x + player.width / 2 - 2.5, player.y));
         }
         player.lastShotTime = now;
+        shootSound.currentTime = 0; // Reset sound to start
+        shootSound.play();
     }
 }
 
@@ -374,14 +432,46 @@ setInterval(() => {
 
 }, 200);
 
+// Cyclical enemy speed pattern
+let speedPattern = [1.0, 1.5, 1.0, 0.1];
+let speedPatternIndex = 0;
+let speedIncreaseInterval;
+
+function startCyclicalSpeedPattern() {
+    clearInterval(speedIncreaseInterval);
+    speedIncreaseInterval = setInterval(() => {
+        speedPatternIndex = (speedPatternIndex + 1) % speedPattern.length;
+        let targetSpeed = speedPattern[speedPatternIndex];
+
+        let innerInterval = setInterval(() => {
+            if (enemySpeedMultiplier < targetSpeed) {
+                enemySpeedMultiplier += 0.01;
+                if (enemySpeedMultiplier >= targetSpeed) {
+                    enemySpeedMultiplier = targetSpeed;
+                    clearInterval(innerInterval);
+                }
+            } else if (enemySpeedMultiplier > targetSpeed) {
+                enemySpeedMultiplier -= 0.01;
+                if (enemySpeedMultiplier <= targetSpeed) {
+                    enemySpeedMultiplier = targetSpeed;
+                    clearInterval(innerInterval);
+                }
+            }
+        }, 1000);
+
+    }, 60000); // Change target speed every 60 seconds
+}
+
+// Initialize enemy speed pattern
+speedIncreaseInterval = setInterval(() => {
+    if (enemySpeedMultiplier < 1.0) {
+        enemySpeedMultiplier += 0.01;
+        if (enemySpeedMultiplier >= 1.0) {
+            enemySpeedMultiplier = 1.0;
+            startCyclicalSpeedPattern();
+        }
+    }
+}, 1000);
+
 // Start game
 gameLoop();
-
-// Gradually increase enemy speed over 60 seconds
-let speedIncreaseInterval = setInterval(() => {
-    enemySpeedMultiplier += 0.01;
-    if (enemySpeedMultiplier >= 1) {
-        enemySpeedMultiplier = 1;
-        clearInterval(speedIncreaseInterval);
-    }
-}, 1000); // Every second increase by 0.016666 to reach 1 in 60 seconds
