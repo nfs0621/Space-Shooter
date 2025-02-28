@@ -6,6 +6,27 @@ const highScoreElement = document.getElementById('highScore');
 const shootSound = document.getElementById('shootSound');
 const explosionSound = document.getElementById('explosionSound');
 
+// Game settings
+const slowMotionToggle = document.getElementById('slowMotionEnabled');
+const autoShootToggle = document.getElementById('autoShootEnabled');
+
+let isSlowMotionEnabled = localStorage.getItem('slowMotionEnabled') !== 'false';
+let isAutoShootEnabled = localStorage.getItem('autoShootEnabled') !== 'false';
+
+slowMotionToggle.checked = isSlowMotionEnabled;
+autoShootToggle.checked = isAutoShootEnabled;
+
+// Save preferences when changed
+slowMotionToggle.addEventListener('change', (e) => {
+    isSlowMotionEnabled = e.target.checked;
+    localStorage.setItem('slowMotionEnabled', isSlowMotionEnabled);
+});
+
+autoShootToggle.addEventListener('change', (e) => {
+    isAutoShootEnabled = e.target.checked;
+    localStorage.setItem('autoShootEnabled', isAutoShootEnabled);
+});
+
 const shieldTimerElement = document.getElementById('shieldTimer');
 const tripleShotTimerElement = document.getElementById('tripleShotTimer');
 const slowShotTimerElement = document.getElementById('slowShotTimer');
@@ -137,12 +158,22 @@ class PowerUp {
     }
   getRandomType() {
     const types = Object.values(POWERUP_TYPES);
-    const probabilities = [
+    let probabilities = [
       0.3, // SHIELD (30%)
       0.3, // TRIPLE_SHOT (30%)
-      0.1, // SLOW_SHOT (10%) - Reduced probability
-      0.3, // FAST_SHOT (30%)
+      0.0, // SLOW_SHOT (0% when disabled)
+      0.4, // FAST_SHOT (40% when slow shot disabled)
     ];
+
+    // Adjust probabilities based on slow motion setting
+    if (isSlowMotionEnabled) {
+      probabilities = [
+        0.3, // SHIELD (30%)
+        0.3, // TRIPLE_SHOT (30%)
+        0.1, // SLOW_SHOT (10%)
+        0.3, // FAST_SHOT (30%)
+      ];
+    }
 
     let cumulativeProbability = 0;
     const randomNumber = Math.random();
@@ -250,7 +281,14 @@ function gameLoop() {
             player.y < enemy.y + enemy.height &&
             player.y + player.height > enemy.y
         ) {
-            if (!player.shielded){
+            if (player.shielded) {
+                // Destroy enemy on shield contact
+                enemies.splice(index, 1);
+                score += 10;
+                enemiesKilled++;
+                explosionSound.currentTime = 0;
+                explosionSound.play();
+            } else {
                 gameOver();
             }
         }
@@ -295,11 +333,17 @@ function gameLoop() {
         enemiesKilledElement.textContent = `Killed: ${totalEnemies > 0 ? ((enemiesKilled / totalEnemies) * 100).toFixed(0) : 0}%`;
         enemiesMissedElement.textContent = `Missed: ${totalEnemies > 0 ? ((enemiesMissed / totalEnemies) * 100).toFixed(0) : 0}%`;
 
-        // Update powerup timers
+        // Update powerup timers and visibility
         const now = Date.now();
         shieldTimerElement.textContent = player.shielded ? Math.max(0, Math.ceil((powerUpEndTimes[POWERUP_TYPES.SHIELD] - now) / 1000)) : 0;
         tripleShotTimerElement.textContent = player.tripleShot ? Math.max(0, Math.ceil((powerUpEndTimes[POWERUP_TYPES.TRIPLE_SHOT] - now) / 1000)) : 0;
-        slowShotTimerElement.textContent = player.slowShot ? Math.max(0, Math.ceil((powerUpEndTimes[POWERUP_TYPES.SLOW_SHOT] - now) / 1000)) : 0;
+        
+        // Only show slow shot timer if feature is enabled
+        slowShotTimerElement.parentElement.style.display = isSlowMotionEnabled ? 'block' : 'none';
+        if (isSlowMotionEnabled) {
+            slowShotTimerElement.textContent = player.slowShot ? Math.max(0, Math.ceil((powerUpEndTimes[POWERUP_TYPES.SLOW_SHOT] - now) / 1000)) : 0;
+        }
+        
         fastShotTimerElement.textContent = player.fastShot ? Math.max(0, Math.ceil((powerUpEndTimes[POWERUP_TYPES.FAST_SHOT] - now) / 1000)) : 0;
 
         // Update and draw powerups
@@ -361,7 +405,9 @@ function activatePowerUp(powerUp) {
             setPowerUp(POWERUP_TYPES.TRIPLE_SHOT, 7000, 'tripleShot');
             break;
         case POWERUP_TYPES.SLOW_SHOT:
-            setPowerUp(POWERUP_TYPES.SLOW_SHOT, 10000, 'slowShot');
+            if (isSlowMotionEnabled) {
+                setPowerUp(POWERUP_TYPES.SLOW_SHOT, 10000, 'slowShot');
+            }
             break;
         case POWERUP_TYPES.FAST_SHOT:
             // Override slow shot
@@ -418,7 +464,7 @@ function attemptShoot() {
     if (player.slowShot) {
         currentShotInterval = 1000;
     } else if (player.fastShot) {
-        currentShotInterval = 1; // 1ms interval
+        currentShotInterval = 0.05; // Twice as fast (0.05ms interval)
     }
 
     if (now - player.lastShotTime > currentShotInterval) {
@@ -457,8 +503,8 @@ document.addEventListener('keydown', (e) => {
 let powerupCooldown = 0;
 
 setInterval(() => {
-    // Call attemptShoot on interval if mouse is down
-    if (isShooting) {
+    // Call attemptShoot if auto-shoot is enabled or mouse button is down
+    if (isAutoShootEnabled || isShooting) {
         attemptShoot();
     }
 
