@@ -71,7 +71,7 @@ class Enemy {
     }
 
     update() {
-        this.y += this.speed;
+        this.y += this.speed * enemySpeedMultiplier;
     }
 
     draw() {
@@ -93,6 +93,7 @@ let enemiesSpawned = 0;
 let gameRunning = true;
 let highScore = localStorage.getItem('highScore') || 0;
 highScoreElement.textContent = `High Score: ${highScore}`;
+let enemySpeedMultiplier = 0.5;
 
 const POWERUP_TYPES = {
     SHIELD: 'shield',
@@ -375,3 +376,12 @@ setInterval(() => {
 
 // Start game
 gameLoop();
+
+// Gradually increase enemy speed over 60 seconds
+let speedIncreaseInterval = setInterval(() => {
+    enemySpeedMultiplier += 0.01;
+    if (enemySpeedMultiplier >= 1) {
+        enemySpeedMultiplier = 1;
+        clearInterval(speedIncreaseInterval);
+    }
+}, 1000); // Every second increase by 0.016666 to reach 1 in 60 seconds
