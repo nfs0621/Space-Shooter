@@ -6,29 +6,28 @@ body {
     justify-content: center;
     align-items: center;
     height: 100vh;
+    flex-direction: column;
 }
 
 #gameCanvas {
     border: 1px solid white;
 }
 
-#score {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    color: white;
-    font-family: Arial, sans-serif;
-    font-size: 20px;
-}
-
 #uiContainer {
-    position: absolute;
-    top: 10px;
-    left: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; /* Align items to the left */
+    margin-bottom: 10px; /* Add some space between UI and canvas */
+    width: 800px; /* Match canvas width */
 }
 
 #uiContainer > div {
-   margin-bottom: 5px;
-   color: white;
-   font-family: Arial, sans-serif;
+    margin-bottom: 5px;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+/* Center score and high score */
+#score, #highScore {
+    align-self: center;
 }

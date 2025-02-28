@@ -7,12 +7,23 @@
     <audio id="explosionSound" src="explosion.mp3" preload="auto"></audio>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
-    <div id="uiContainer">
-        <div id="score">Score: 0</div>
-        <div id="highScore">High Score: 0</div>
+<div id="uiContainer">
+    <div id="score">Score: 0</div>
+    <div id="highScore">High Score: 0</div>
+    <div id="powerupTimers">
+        <div>Shield: <span id="shieldTimer">0</span>s</div>
+        <div>Triple Shot: <span id="tripleShotTimer">0</span>s</div>
+        <div>Slow Shot: <span id="slowShotTimer">0</span>s</div>
+        <div>Fast Shot: <span id="fastShotTimer">0</span>s</div>
     </div>
-    <button id="restartButton" style="display: none;">Restart</button>
+    <div id="enemyStats">
+        <div>Total Enemies: <span id="totalEnemies">0</span></div>
+        <div>Enemies Killed: <span id="enemiesKilled">0</span></div>
+        <div>Enemies Missed: <span id="enemiesMissed">0</span></div>
+    </div>
+</div>
+    <canvas id="gameCanvas"></canvas>
+
     <script src="game.js"></script>
 </body>
 </html>
